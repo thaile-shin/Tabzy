@@ -51,10 +51,13 @@
                     console.log(data);
                 }
             });
-            tabs1.switchTab
 
             const tabs2 = new Tabzy('#tabs2', {
                 remember: true,
+                onChange: (data) => {
+                    // data.tab, data.panel
+                    console.log(data);
+                }
             });
         </script>
     </body>
