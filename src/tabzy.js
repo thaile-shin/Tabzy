@@ -26,10 +26,15 @@ function Tabzy(selector, option) {
         })
         .filter(Boolean);
     if (this.tabs.length !== this.panels.length) return;
-    this.opt = Object.assign({
-        remember: false,
-    }, options)
+    this.opt = Object.assign(
+        {
+            remember: false,
+            onChange: null,
+        },
+        option
+    );
 
+    this.paramKey = selector.replace(/[^a-zA-Z0-9]/g, "");
     this._init();
 }
 Tabzy.prototype._init = function () {
@@ -45,11 +50,19 @@ Tabzy.prototype._init = function () {
     // }
 
     // 2. locaton hash
-    const hash = location.hash;
+    const params = new URLSearchParams(location.search);
+    const tabSelect = params.get(this.paramKey);
     const tab =
-        (this.opt.remember && hash && this.tabs.find((tab) => tab.getAttribute("href") === hash)) ||
+        (this.opt.remember &&
+            tabSelect &&
+            this.tabs.find(
+                (tab) =>
+                    tab.getAttribute("href").replace(/[^a-zA-Z0-9]/g, "") ===
+                    tabSelect
+            )) ||
         this.tabs[0];
-    this._activateTab(tab);
+    this.currentTab = tab;
+    this._activateTab(tab, false);
 
     this.tabs.forEach((tab) => {
         tab.onclick = (event) => this._handleTabClick(event, tab);
@@ -59,10 +72,17 @@ Tabzy.prototype._init = function () {
 Tabzy.prototype._handleTabClick = function (event, tab) {
     event.preventDefault();
 
-    this._activateTab(tab);
+    this._tryActiveTab(tab);
 };
 
-Tabzy.prototype._activateTab = function (tab) {
+Tabzy.prototype._tryActiveTab = function (tab) {
+    if(this.currentTab !== tab) {
+        this._activateTab(tab);
+        this.currentTab = tab;
+    }
+}
+
+Tabzy.prototype._activateTab = function (tab, triggerOnChange = true) {
     this.tabs.forEach((tab) => {
         tab.closest("li").classList.remove("tabzy--active");
     });
@@ -76,15 +96,26 @@ Tabzy.prototype._activateTab = function (tab) {
 
     // localStorage.setItem('tabzy--active', tab.getAttribute('href'));
 
-    if(this.opt.remember) {
-        history.replaceState(null, null, tab.getAttribute("href"));
+    if (this.opt.remember) {
+        const params = new URLSearchParams(location.search);
+        const paramValue = tab
+            .getAttribute("href")
+            .replace(/[^a-zA-Z0-9]/g, "");
+        params.set(this.paramKey, paramValue);
+        history.replaceState(null, null, `?${params}`);
+    }
+
+    if (triggerOnChange && typeof this.opt.onChange === "function") {
+        this.opt.onChange({
+            tab,
+            panel: panelActive,
+        });
     }
 };
 
 Tabzy.prototype.switchTab = function (input) {
     let tabToActivate = null;
 
-    console.log(input);
     if (typeof input === "string") {
         tabToActivate = this.tabs.find(
             (tab) => tab.getAttribute("href") === input
@@ -102,7 +133,8 @@ Tabzy.prototype.switchTab = function (input) {
         console.error(`Tabzy: Invalid Input: '${input}'`);
         return;
     }
-    this._activateTab(tabToActivate);
+    
+    this._tryActiveTab(tabToActivate);
 };
 
 Tabzy.prototype.destroy = function () {
@@ -121,4 +153,5 @@ Tabzy.prototype.destroy = function () {
     this.container = null;
     this.tabs = null;
     this.panels = null;
+    this.currentTab = null;
 };
